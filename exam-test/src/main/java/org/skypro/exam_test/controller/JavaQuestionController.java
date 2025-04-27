@@ -1,86 +1,81 @@
 package org.skypro.exam_test.controller;
 
-
 import org.skypro.exam_test.question.Question;
+
+import org.skypro.exam_test.services.ExaminerService;
+import org.skypro.exam_test.services.ExaminerServiceImpl;
 import org.skypro.exam_test.services.JavaQuestionService;
 import org.skypro.exam_test.services.MathQuestionService;
-import org.skypro.exam_test.services.QuestionService;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
+
 
 @RestController
 @RequestMapping("/exam/java")
 public class JavaQuestionController {
-    private final JavaQuestionService service;
-    private final MathQuestionService questionService;
 
-    public JavaQuestionController(JavaQuestionService service, MathQuestionService questionService) {
-        this.questionService = questionService;
-        this.service = service;
+    private final JavaQuestionService javaQuestionService;
+    private final MathQuestionService mathQuestionService;
+    private final ExaminerService examinerService;
+
+
+    public JavaQuestionController(JavaQuestionService javaQuestionService, ExaminerService examinerService, MathQuestionService mathQuestionService) {
+        this.javaQuestionService = javaQuestionService;
+        this.examinerService = examinerService;
+        this.mathQuestionService = mathQuestionService;
     }
 
     @GetMapping("/add")
-    @PostMapping("/add")
-    public ResponseEntity<List<Question>> addQuestion(
+    public Collection<Question> addQuestion(
             @RequestParam String question,
-            @RequestParam String answer,
-            @RequestParam String option1,
-            @RequestParam String option2,
-            @RequestParam String option3) {
+            @RequestParam String correctAnswer,
+            @RequestParam String wrongOption1,
+            @RequestParam String wrongOption2,
+            @RequestParam String wrongOption3) {
 
-        // Добавляем новый вопрос
-        Question newQuestion = service.addQuestion(question, answer, option1, option2, option3);
+        Question newQuestion = javaQuestionService.add(question, correctAnswer, wrongOption1, wrongOption2, wrongOption3);
 
-        // Получаем последние использованные вопросы
-        List<Question> lastUsedQuestions = ((JavaQuestionService) service).getLastUsedQuestions();
-
-        // Добавляем новый вопрос к последним использованным
-        List<Question> result = new ArrayList<>(lastUsedQuestions);
-        result.add(newQuestion);
-
-        return ResponseEntity.ok(result); // Возвращаем обновленный список
-
-    }
-
-    @GetMapping
-    public Collection<Question> getAll() {
-        return service.getQuestions();
+        return ((ExaminerServiceImpl) examinerService).addQuestionToHistory(newQuestion);
     }
 
     @GetMapping("/remove/{id}")
-      public ResponseEntity<String> removeQuestion(@PathVariable UUID id) {
-        // Удаление вопроса из JavaQuestionService
-        Question removedJavaQuestion = service.removeQuestionById(id);
-
-        // Удаление вопроса из MathQuestionService
-        Question removedMathQuestion = questionService.removeQuestionById(id);
-
-        // Проверяем, был ли удален хотя бы один вопрос
-        if (removedJavaQuestion != null || removedMathQuestion != null) {
-            return ResponseEntity.ok("Вопрос с ID " + id + " найден и удален.");
+    public ResponseEntity<String> removeQuestion(@PathVariable UUID id) {
+        Question removedQuestion = javaQuestionService.remove(id);
+        if (removedQuestion != null) {
+            return ResponseEntity.ok("Вопрос с ID " + id + " удален");
+        }
+        removedQuestion = mathQuestionService.remove(id);
+        if (removedQuestion != null) {
+            return ResponseEntity.ok("Вопрос с ID " + id + " удален");
         }
 
-        // Если вопрос не найден ни в одном из сервисов
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Вопрос с ID " + id + " не найден!");
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Вопрос с ID " + id + " не найден");
     }
-    @GetMapping("/find")
-    public ResponseEntity<?> findQuestionsByKeyword(@RequestParam String keyword) {
-        List<Question> foundQuestions = service.findQuestionsByKeyword(keyword); // Java-вопросы
-        List<Question> foundMathQuestions = questionService.findQuestionsByKeyword(keyword); // Математические вопросы
 
-        // Объединяем списки
-        List<Question> allFoundQuestions = new ArrayList<>();
-        allFoundQuestions.addAll(foundQuestions);
-        allFoundQuestions.addAll(foundMathQuestions);
+    @GetMapping("/search")
+    public ResponseEntity<?> searchQuestions(@RequestParam String query) {
+        Collection<Question> javaresults = javaQuestionService.searchByKeyword(query);
+        Collection<Question> mathresults = mathQuestionService.searchByKeyword(query);
 
-        if (allFoundQuestions.isEmpty()) {
+        List<Question> combinedResults = new ArrayList<>();
+        combinedResults.addAll(javaresults);
+        combinedResults.addAll(mathresults);
+
+        if (combinedResults.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Не найдено вопросов с искомым словом: " + keyword);
+                    .body("Нет совпадений по вашему запросу");
         }
 
-        return ResponseEntity.ok(allFoundQuestions);
+        return ResponseEntity.ok(combinedResults);
+    }
+
+    @GetMapping
+    public Collection<Question> getAllQuestions() {
+        return javaQuestionService.getAll();
     }
 }

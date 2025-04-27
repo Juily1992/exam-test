@@ -2,8 +2,8 @@ package org.skypro.exam_test.services;
 
 import org.skypro.exam_test.question.Question;
 
-import java.util.List;
+import java.util.Collection;
 
 public interface ExaminerService {
-    List<Question> getQuestions(int amount);
+    Collection<Question> getQuestions(int amount);
 }

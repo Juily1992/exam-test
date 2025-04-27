@@ -3,36 +3,49 @@ package org.skypro.exam_test.services;
 import org.skypro.exam_test.question.Question;
 import org.springframework.stereotype.Service;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.*;
 
 @Service
 public class ExaminerServiceImpl implements ExaminerService {
-    private final List<QuestionService> questionServices;
+    private Set<Question> lastQuestions = new HashSet<>();
+    private final JavaQuestionService javaQuestionService;
+    private final MathQuestionService mathQuestionService;
 
-    public ExaminerServiceImpl(List<QuestionService> questionServices) {
-        this.questionServices = questionServices;
+    public ExaminerServiceImpl(JavaQuestionService javaQuestionService, MathQuestionService mathQuestionService) {
+        this.javaQuestionService = javaQuestionService;
+        this.mathQuestionService = mathQuestionService;
     }
 
     @Override
-    public List<Question> getQuestions(int amount) {
-        List<Question> allQuestions = questionServices.stream()
-                .flatMap(service -> service.getQuestions().stream())
-                .collect(Collectors.toList());
+    public Collection<Question> getQuestions(int amount) {
 
-        if (amount > allQuestions.size()) {
-            throw new IllegalArgumentException("Not enough questions available");
+        List<Question> allQuestions = new ArrayList<>();
+        allQuestions.addAll(javaQuestionService.getAll());
+        allQuestions.addAll(mathQuestionService.getAll());
+
+        Set<Question> uniqueQuestions = new HashSet<>(allQuestions);
+
+        if (amount > uniqueQuestions.size()) {
+            throw new IllegalArgumentException("Недостаточно вопросов. Запрошено: " + amount + ", Доступно: " + uniqueQuestions.size());
         }
 
-        Set<Question> uniqueQuestions = new HashSet<>();
+        List<Question> shuffled = new ArrayList<>(uniqueQuestions);
+        Collections.shuffle(shuffled);
+
+        Set<Question> selected = new HashSet<>();
         Random random = new Random();
-        while (uniqueQuestions.size() < amount) {
-            int index = random.nextInt(allQuestions.size());
-            uniqueQuestions.add(allQuestions.get(index));
+        while (selected.size() < amount) {
+            int index = random.nextInt(shuffled.size());
+            selected.add(shuffled.get(index));
         }
-        return List.copyOf(uniqueQuestions);
+
+        lastQuestions = new HashSet<>(selected);
+        return selected;
     }
+
+    public Collection<Question> addQuestionToHistory(Question newQuestion) {
+        lastQuestions.add(newQuestion);
+        return lastQuestions;
+    }
+
 }

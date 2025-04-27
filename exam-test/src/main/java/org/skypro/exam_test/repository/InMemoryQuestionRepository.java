@@ -3,10 +3,14 @@ package org.skypro.exam_test.repository;
 import org.skypro.exam_test.question.Question;
 import org.springframework.stereotype.Repository;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 @Repository
 public class InMemoryQuestionRepository implements QuestionRepository {
+
     private final Map<UUID, Question> questions = new HashMap<>();
 
     @Override
@@ -22,10 +26,6 @@ public class InMemoryQuestionRepository implements QuestionRepository {
 
     @Override
     public Collection<Question> getAll() {
-        return Collections.unmodifiableCollection(questions.values()); // Возвращаем только значения
-    }
-
-    public Question findById(UUID id) {
-        return questions.get(id);
+        return questions.values();
     }
 }

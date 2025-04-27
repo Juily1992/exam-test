@@ -1,90 +1,70 @@
 package org.skypro.exam_test.services;
 
-import org.skypro.exam_test.exceptions.DuplicateQuestionException;
 import org.skypro.exam_test.question.Question;
 import org.skypro.exam_test.repository.QuestionRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class MathQuestionService implements QuestionService {
-    private final Map<UUID, Question> questions = new HashMap<>();
-    private final List<Question> lastUsedQuestions = new ArrayList<>(); // Кэш последних вопросов
-    private static final int MAX_LAST_USED = 10; // Максимальное количеств
 
-    public MathQuestionService() {
-        initializeQuestions();
+    private final QuestionRepository repository;
+    private final Map<UUID, Question> questions = new HashMap<>();
+
+    public MathQuestionService(QuestionRepository repository) {
+        this.repository = repository;
+        initializeHistoryQuestions();
     }
 
-    private void initializeQuestions() {
-        addQuestion("Сколько будет 2 + 2?", "4", "30", "14", "12");
-        addQuestion("Сколько будет 5 * 3?", "15", "25", "50", "10");
-        addQuestion("Чему равен квадрат числа 7?", "49", "39", "59", "29");
-        addQuestion("Какое число больше: 10 или 15?", "15", "12", "15");
-        addQuestion("Сколько секунд в минуте?", "60", "30", "120", "90");
-        addQuestion("Чему равен корень из 16?", "4", "8", "2", "6");
-        addQuestion("Сколько градусов в прямом угле?", "90", "180", "45", "120");
-        addQuestion("Какова площадь квадрата со стороной 3?", "9", "8", "2", "3");
-        addQuestion("Сколько будет 100 / 10?", "10", "12", "10");
-        addQuestion("Чему равна сумма углов треугольника?", "180", "25", "10");
+    private void initializeHistoryQuestions() {
+        add("Сколько будет 2 + 2?", "4", "3", "5", "6");
+        add("Чему равно 5 × 5?", "25", "10", "20", "30");
+        add("Какова площадь круга с радиусом 3?", "9π", "6π", "3π", "12π");
+        add("Решите уравнение: 2x = 10", "5", "2", "10", "20");
+        add("Чему равен sin(90°)?", "1", "0", "0.5", "√2/2");
+        add("Сколько градусов в прямом угле?", "90°", "45°", "180°", "360°");
+        add("10% от 100 равно...", "10", "5", "15", "20");
+        add("Какая фигура имеет три стороны?", "Треугольник", "Квадрат", "Круг", "Пятиугольник");
+        add("Чему равен квадратный корень из 64?", "8", "4", "6", "32");
+        add("Если x = 3, то чему равно 2x + 5?", "11", "8", "10", "15");
     }
 
     @Override
-    public Question addQuestion(String questionText, String answer, String... options) {
-        Question newQuestion = new Question(questionText, answer, options);
-
-        if (questions.values().stream()
-                .anyMatch(q -> q.getQuestion().equals(questionText)
-                        && q.getAnswer().equals(answer))) {
-            throw new DuplicateQuestionException("Вопрос уже существует");
+    public Question add(String question, String correctAnswer, String wrongOption1, String wrongOption2, String wrongOption3) {
+        if (questions.values().stream().anyMatch(q -> q.getQuestion().equalsIgnoreCase(question))) {
+            throw new IllegalArgumentException("Вопрос уже существует");
         }
-
+        Question newQuestion = new Question(question, correctAnswer, wrongOption1, wrongOption2, wrongOption3);
         questions.put(newQuestion.getId(), newQuestion);
         return newQuestion;
     }
 
-    public List<Question> getLastUsedQuestions() {
-        return Collections.unmodifiableList(lastUsedQuestions); // Возвращаем неизменяемый список
+    public Collection<Question> searchByKeyword(String keyword) {
+        return questions.values().stream()
+                .filter(q -> q.getQuestion().toLowerCase().contains(keyword.toLowerCase()) ||
+                        q.getCorrectAnswer().toLowerCase().contains(keyword.toLowerCase()))
+                .toList();
     }
 
-    public void updateLastUsedQuestions(List<Question> newQuestions) {
-        lastUsedQuestions.clear();
-        lastUsedQuestions.addAll(newQuestions);
-        // Ограничиваем размер кэша
-        if (lastUsedQuestions.size() > MAX_LAST_USED) {
-            lastUsedQuestions.subList(0, lastUsedQuestions.size() - MAX_LAST_USED).clear();
-        }
+    @Override
+    public Collection<Question> getAll() {
+        return questions.values();
     }
 
-        @Override
-    public Question removeQuestionById(UUID id) {
-        return questions.remove(id); // Удаляем вопрос из мапы по ключу
+    @Override
+    public Question remove(UUID id) {
+        return questions.remove(id); //
     }
+
 
     @Override
     public Question getRandomQuestion() {
         if (questions.isEmpty()) {
-            throw new IllegalStateException("No questions available");
+            throw new RuntimeException("Список пуст!");
         }
-        List<UUID> keys = new ArrayList<>(questions.keySet());
         Random random = new Random();
-        UUID randomKey = keys.get(random.nextInt(keys.size()));
-        return questions.get(randomKey);
+        List<Question> questionList = new ArrayList<>(questions.values());
+        return questionList.get(random.nextInt(questionList.size()));
     }
-
-    @Override
-    public List<Question> findQuestionsByKeyword(String keyword) {
-        return questions.values().stream()
-                .filter(q -> q.getQuestion().toLowerCase().contains(keyword.toLowerCase())
-                        || q.getAnswer().toLowerCase().contains(keyword.toLowerCase()))
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public Collection<Question> getQuestions() {
-        return Collections.unmodifiableCollection(questions.values()); // Возвращаем только значения
-    }
-
 }
